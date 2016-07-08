@@ -12,10 +12,11 @@ This allows to make something like this:
 
     include CrChainableMethods::Pipe
     result = pipe "Hello World"
-      .>> Foo.split_words
-      .>> Foo.append_message("Bar")
+      .>> split(" ")
+      .>> Foo.append_message("from module")
       .>> Bar.add_something
-      .>> Foo.join
+      .>> ->(l : Array(String)){ l + ["from block"] }.call
+      .>> join(" - ")
       .>> unwrap
 
 ## Installation
@@ -26,26 +27,19 @@ You can add this library as a dependency in your `shard.yml` file.
 
 Right now you can include the Pipe module in the Program so the `pipe` macro is globally available.
 
+With this new pseudo-operator ".>>" you can chain together:
+
+  * methods from the resulting object itself (like calling #split for "Hello World")
+  * passing the resulting object as the first argument of module function (such as Bar.add_something)
+  * passing the resulting object as the argument for a Proc call (you have to specify the type)
+
+And at this point it must always end with the #unwrap call to get the final result.
+
 ## Development
 
 The way it's built right now requires stringification of the AST to replace the ">>" pseudo-operator as the ".pipe" macro. But this means that any ">>" will be replaced, even if it's passed as a string argument in one of the chained methods, for example.
 
-My original Ruby implementation takes care of chaining a method that the previous returned object knows how to respond, so instead of passing the returned object as the first argument of the method, it tries to call the method in the object itself. This is not covered in the implementation. For example:
-
-    "Hello World"
-      .>> split(",")
-
-In the Ruby version the above becomes:
-
-    "Hello World".split(",")
-
-But in the current Crystal version this becomes:
-
-    split("Hello World", ",")
-
-And this will obviously fail unless you have another "split" function that satisfies the signature above.
-
-Finally, if you chain methods from different modules, you need to explicitly use the "Module.method()" notation. And the way the AST is traversed requires a second stringification to remove the /\(.*\)$/ from this call to properly allow this format, this may lead to other side-effects in the process.
+If you chain methods from different modules, you need to explicitly use the "Module.method()" notation. And the way the AST is traversed requires a second stringification to remove the /\(.*\)$/ from this call to properly allow this format, this may lead to other side-effects in the process.
 
 ## Contributing
 
