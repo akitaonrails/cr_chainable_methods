@@ -5,13 +5,20 @@ require "./cr_chainable_methods/*"
 
 module CrChainableMethods
   module Pipe
+    # This is the way to have a pseudo-operator, the problem is that the gsub will replace the
+    # >> string everywhere including if it's part of a method argument
+    #
+    # The recursive #pipe call will transform the ast like this:
+    #
+    #    "\"Hello World Foo Bar\" >> (downcase >> (split >> (reverse >> ((join(\" - \")) >> unwrap))))"
+    #    "\"Hello World Foo Bar\".pipe (downcase.pipe (split.pipe (reverse.pipe ((join(\" - \")).pipe unwrap))))"
+    #    "\"Hello World Foo Bar\".pipe(downcase.pipe(split.pipe(reverse.pipe((join(\" - \")).pipe(unwrap)))))"
+    #    "\"Hello World Foo Bar\".downcase.pipe(split.pipe(reverse.pipe((join(\" - \")).pipe(unwrap))))"
+    #    "\"Hello World Foo Bar\".downcase.split.pipe(reverse.pipe((join(\" - \")).pipe(unwrap)))"
+    #    "\"Hello World Foo Bar\".downcase.split.reverse.pipe((join(\" - \")).pipe(unwrap))"
+    #    "(\"Hello World Foo Bar\".downcase.split.reverse.join(\" - \")).pipe(unwrap)"
     macro pipe(ast)
-      # This is the way to have a pseudo-operator, the problem is that the gsub will replace the
-      # >> string everywhere including if it's part of a method argument
-
-      # example: "\"Hello World\" >> (Foo.split_words >> ((Foo.append_message(\"Bar\")) >> (Bar.add_something >> (Foo.join >> unwrap))))"
       {% uast = ast.stringify.gsub(/ >>/, ".pipe").id %}
-      # becomes: "\"Hello World\".pipe (Foo.split_words.pipe ((Foo.append_message(\"Bar\")).pipe (Bar.add_something.pipe (Foo.join.pipe unwrap))))"
 
       {% if uast.stringify != ast.stringify %}
         pipe {{uast}}
@@ -24,13 +31,15 @@ module CrChainableMethods
             {{ast.args.first.name}}({{ast.receiver}}, {{ast.args.first.args.argify}})
 
           {% else %}
-            {% receiver_name = ast.args.first.receiver.stringify.gsub(/\(.*\)$/, "").id %}
+            {% receiver_method = ast.args.first.receiver.stringify.gsub(/\(.*\)$/, "").id %}
             {% receiver_args = ast.args.first.receiver.args.argify %}
 
-            {% if receiver_name.stringify.split(".").size > 1 %}
-              pipe {{receiver_name}}({{ast.receiver}}, {{receiver_args}}).pipe {{first_arg}}
+            {% if receiver_method.stringify.split(".").size > 1 %}
+              # if it is a `Module.method()` call pass the receiver as the first argument
+              pipe {{receiver_method}}({{ast.receiver}}, {{receiver_args}}).pipe {{first_arg}}
             {% else %}
-              pipe {{ast.receiver}}.{{receiver_name}}({{receiver_args}}).pipe {{first_arg}}
+              # if the method can be called in the receiver itself, use dot-notation like `receiver.receiver_method`
+              pipe {{ast.receiver}}.{{receiver_method}}({{receiver_args}}).pipe {{first_arg}}
             {% end %}
           {% end %}
 
