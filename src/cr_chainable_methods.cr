@@ -28,7 +28,11 @@ module CrChainableMethods
           {% first_arg = ast.args.first.args.argify %}
 
           {% if ast.args.first.receiver.is_a?(Nop) %}
-            {{ast.args.first.name}}({{ast.receiver}}, {{ast.args.first.args.argify}})
+            {% if ast.args.first.args.size > 0 %}
+              {{ast.args.first.name}}({{ast.receiver}}, {{ast.args.first.args.argify}})
+            {% else %}
+              {{ast.args.first.name}}({{ast.receiver}})
+            {% end %}
 
           {% else %}
             {% receiver_method = ast.args.first.receiver.stringify.gsub(/\(.*\)$/, "").id %}
@@ -36,7 +40,11 @@ module CrChainableMethods
 
             {% if receiver_method.stringify.split(".").size > 1 %}
               # if it is a `Module.method()` call pass the receiver as the first argument
-              pipe {{receiver_method}}({{ast.receiver}}, {{receiver_args}}).pipe {{first_arg}}
+              {% if receiver_args.size > 0 %}
+                pipe {{receiver_method}}({{ast.receiver}}, {{receiver_args}}).pipe {{first_arg}}
+              {% else %}
+                pipe {{receiver_method}}({{ast.receiver}}).pipe {{first_arg}}
+              {% end %}
             {% else %}
               # if the method can be called in the receiver itself, use dot-notation like `receiver.receiver_method`
               pipe {{ast.receiver}}.{{receiver_method}}({{receiver_args}}).pipe {{first_arg}}
