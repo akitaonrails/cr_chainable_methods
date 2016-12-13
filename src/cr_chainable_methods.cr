@@ -25,7 +25,7 @@ module CrChainableMethods
 
       {% else %}
         {% if ast.name.id == "pipe".id %}
-          {% first_arg = ast.args.first.args.argify %}
+          {% first_arg = ast.args.first.args.splat %}
 
           {% if ast.args.first.receiver.is_a?(Nop) %}
             {% if ast.args.first.args.size > 0 %}
@@ -36,7 +36,7 @@ module CrChainableMethods
 
           {% else %}
             {% receiver_method = ast.args.first.receiver.stringify.gsub(/\(.*\)$/, "").id %}
-            {% receiver_args = ast.args.first.receiver.args.argify %}
+            {% receiver_args = ast.args.first.receiver.args.splat %}
 
             {% if receiver_method.stringify.split(".").size > 1 %}
               # if it is a `Module.method()` call pass the receiver as the first argument
